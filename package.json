@@ -1,0 +1,15 @@
+{
+  "name": "fullstack-monorepo-pro",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"pnpm --filter server dev\" \"pnpm --filter web dev\"",
+    "build": "pnpm --filter server build && pnpm --filter web build",
+    "db:init": "node -e \"const fs=require('fs'); const {Pool}=require('pg'); const pool=new Pool({user:'postgres',host:'localhost',database:'postgres',password:'password',port:5432}); const sql=fs.readFileSync('packages/server/src/db/schema.sql','utf8'); pool.query(sql).then(()=>process.exit(0)).catch(e=>{console.error(e);process.exit(1)})\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.3.3"
+  },
+  "packageManager": "pnpm@8.15.0"
+}
