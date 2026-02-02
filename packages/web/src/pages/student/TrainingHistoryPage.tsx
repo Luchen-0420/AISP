@@ -96,17 +96,10 @@ export const TrainingHistoryPage: React.FC = () => {
                                                 size="sm"
                                                 variant="outline"
                                                 onClick={() => {
-                                                    // Navigate to result page with mocked state or proper fetch
-                                                    // Ideally ResultPage should fetch by ID from URL
-                                                    // For MVP, if we don't have ID support in ResultPage yet, this might fail to show details
-                                                    // But user asked for entry point.
-                                                    // Let's assume ResultPage supports "passedScores" for now as seen before
-                                                    navigate(`/student/training/${record.variant_id}/result`, {
-                                                        state: { resultData: record.final_score }
-                                                    });
+                                                    navigate(`/student/replay/${record.id}`);
                                                 }}
                                             >
-                                                查看详情
+                                                查看回放
                                             </Button>
                                         </td>
                                     </tr>

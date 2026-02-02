@@ -54,4 +54,14 @@ export class ClassController {
             return errorResponse(res, error.message);
         }
     }
+    static async getAnalytics(req, res) {
+        try {
+            const { id } = req.params;
+            const analytics = await ClassService.getClassAnalytics(id);
+            return successResponse(res, analytics);
+        }
+        catch (error) {
+            return errorResponse(res, error.message);
+        }
+    }
 }

@@ -23,7 +23,7 @@ export class CaseService {
     // Get variants available for a specific student (based on their teacher)
     static async getVariantsForStudent(studentId) {
         const result = await pool.query(`
-            SELECT DISTINCT v.id, v.variant_name, v.difficulty_level, t.disease_name 
+            SELECT DISTINCT v.id, v.variant_name, v.difficulty_level, v.created_at, t.disease_name 
             FROM case_variants v
             JOIN case_templates t ON v.template_id = t.id
             JOIN classes c ON c.teacher_id = t.created_by

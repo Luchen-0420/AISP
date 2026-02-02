@@ -77,6 +77,13 @@ export class CaseGenerationService {
             }
         }
 
+
+
+        // Inject original parameters to ensure they are preserved for saving
+        variantData.difficulty = params.difficulty;
+        variantData.compliance = params.compliance;
+        variantData.personality_traits = variantData.personality_traits || params.personality; // Prefer AI generated, fallback to input
+
         return variantData;
     }
 
@@ -107,7 +114,7 @@ export class CaseGenerationService {
         };
 
         // Default values for required fields not in AI output
-        const difficultyLevel = 'Medium'; // Or derive from params if passed
+        const difficultyLevel = variantData.difficulty || variantData.difficulty_level || 'Medium';
         const estimatedDuration = 15;
 
         const result = await pool.query(

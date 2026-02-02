@@ -176,6 +176,39 @@ export const TrainingResultPage: React.FC = () => {
                     )}
                 </Card>
 
+                <div className="flex justify-center gap-4 py-8">
+                    {location.state?.completionId && (
+                        <Button
+                            variant="outline"
+                            onClick={async () => {
+                                try {
+                                    const { default: request } = await import('../../api/request');
+                                    const res = await request.get(`/training/session/${location.state.completionId}/export`, {
+                                        responseType: 'blob'
+                                    });
+                                    const blob = new Blob([res as any], { type: 'text/csv' });
+                                    const url = window.URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `OSCE_Report_${location.state.completionId}.csv`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    window.URL.revokeObjectURL(url);
+                                    document.body.removeChild(a);
+                                } catch (e) {
+                                    console.error("Export failed", e);
+                                    alert("导出失败，请稍后重试");
+                                }
+                            }}
+                        >
+                            📋 导出评分表
+                        </Button>
+                    )}
+                    <Button onClick={() => navigate('/student')}>
+                        返回训练主页
+                    </Button>
+                </div>
+
             </div>
         </div>
     );

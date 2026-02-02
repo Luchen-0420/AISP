@@ -1,5 +1,8 @@
 import { pool } from '../db/client';
 
+// Safe rowCount check helper
+const hasRows = (result: any) => result && result.rowCount && result.rowCount > 0;
+
 async function debugStudentView() {
     try {
         console.log('--- Debugging Student View ---');
@@ -22,7 +25,7 @@ async function debugStudentView() {
             // Check available classes
             const classesRes = await pool.query("SELECT * FROM classes");
             console.log(`   -> Total classes available in system: ${classesRes.rowCount}`);
-            if (classesRes.rowCount > 0) {
+            if (hasRows(classesRes)) {
                 console.log(`   -> Suggestion: Add student ${student.username} to class '${classesRes.rows[0].name}' (ID: ${classesRes.rows[0].id})`);
             } else {
                 console.log('   -> No classes exist. Teacher needs to create a class first.');
@@ -52,14 +55,14 @@ async function debugStudentView() {
         const serviceRes = await pool.query(serviceQuery, [student.id]);
         console.log(`Service Query returned ${serviceRes.rowCount} rows.`);
 
-        if (serviceRes.rowCount === 0) {
+        if (!hasRows(serviceRes)) {
             console.log('❌ Service query failed to return data. diagnosing JOINs...');
 
             // Diagnosis 1: Check if there are ANY templates for this teacher
             const temRes = await pool.query("SELECT id, created_by FROM case_templates WHERE created_by = $1", [teacherId]);
             console.log(`   -> Templates by Teacher ${teacherId}: ${temRes.rowCount}`);
 
-            if (temRes.rowCount > 0) {
+            if (hasRows(temRes)) {
                 // Diagnosis 2: Check variants for these templates
                 const firstTemplateId = temRes.rows[0].id;
                 const varRes = await pool.query("SELECT id FROM case_variants WHERE template_id = $1", [firstTemplateId]);
@@ -78,7 +81,7 @@ async function debugStudentView() {
                 WHERE c.id = $1 AND t.created_by = c.teacher_id
                 LIMIT 1
             `, [classId]);
-            console.log(`   -> Join Check (Class <-> Template on teacher): ${typeCheck.rowCount > 0 ? 'MATCH' : 'NO MATCH'}`);
+            console.log(`   -> Join Check (Class <-> Template on teacher): ${hasRows(typeCheck) ? 'MATCH' : 'NO MATCH'}`);
         } else {
             console.log('✅ Service query SUCCEEDED! The frontend should show these rows.');
             console.log('Sample Data:', serviceRes.rows[0]);
@@ -100,5 +103,6 @@ async function debugStudentView() {
         await pool.end();
     }
 }
+
 
 debugStudentView();

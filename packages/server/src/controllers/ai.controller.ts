@@ -216,3 +216,59 @@ export const generateFeedback = async (req: Request, res: Response) => {
         res.status(500).json({ message: 'Failed to generate feedback', error: error.message });
     }
 };
+
+// Extract SOAP data from chat history
+export const extractSOAP = async (req: Request, res: Response) => {
+    try {
+        const { messages, variantId } = req.body;
+
+        const apiKey = req.headers['x-custom-api-key'] as string;
+        const baseUrl = req.headers['x-custom-base-url'] as string;
+        const modelName = req.headers['x-model-name'] as string;
+
+        if (!messages || messages.length === 0) {
+            return res.status(400).json({ success: false, message: 'Messages are required' });
+        }
+
+        const result = await aiService.extractSOAPFromChat(messages, {
+            apiKey,
+            baseUrl,
+            modelName
+        });
+
+        res.json({ success: true, data: result });
+
+    } catch (error: any) {
+        console.error('SOAP Extraction Error:', error);
+        res.status(500).json({ success: false, message: 'Failed to extract SOAP', error: error.message });
+    }
+};
+
+// Analyze mood impact of doctor's message
+export const analyzeMood = async (req: Request, res: Response) => {
+    try {
+        const { message, currentMood } = req.body;
+
+        const apiKey = req.headers['x-custom-api-key'] as string;
+        const baseUrl = req.headers['x-custom-base-url'] as string;
+        const modelName = req.headers['x-model-name'] as string;
+
+        if (!message) {
+            return res.status(400).json({ success: false, message: 'Message is required' });
+        }
+
+        const result = await aiService.analyzeMoodImpact(message, {
+            currentMood: currentMood || { emotion: 'calm', trust: 60, comfort: 60 }
+        }, {
+            apiKey,
+            baseUrl,
+            modelName
+        });
+
+        res.json({ success: true, data: result });
+
+    } catch (error: any) {
+        console.error('Mood Analysis Error:', error);
+        res.status(500).json({ success: false, message: 'Failed to analyze mood', error: error.message });
+    }
+};

@@ -1,19 +1,49 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ChatBubble, Message } from './ChatBubble';
 import { Button } from '../ui/Button';
 import request from '../../api/request';
 import { useUserStore } from '../../store/userStore';
-import { useTrainingStore } from '../../store/trainingStore';
+import { useTrainingStore, EmotionType } from '../../store/trainingStore';
+import { OPQRST_ITEMS, detectOPQRSTCoverage } from '../../utils/opqrst';
+
+// 其他常用问句
+const OTHER_QUESTIONS = [
+    { label: '既往史', question: '请问您以前有什么疾病吗？比如高血压、糖尿病？', key: 'past' },
+    { label: '过敏史', question: '您有对什么药物或食物过敏吗？', key: 'allergy' },
+    { label: '用药史', question: '最近有在吃什么药物吗？', key: 'medication' },
+    { label: '家族史', question: '您的家人中有类似的疾病吗？', key: 'family' },
+];
+
+// ============ 动态提示生成 ============
+const getHintByStage = (messageCount: number, coveredItems: string[]): string => {
+    const uncovered = OPQRST_ITEMS.filter(item => !coveredItems.includes(item.key));
+
+    if (messageCount === 0) {
+        return '💡 开始问诊吧！先问问患者「您哪里不舒服？」';
+    }
+
+    if (uncovered.length > 0 && messageCount < 12) {
+        const next = uncovered[0];
+        return `💡 建议问：${next.fullName} — "${next.question.slice(0, 20)}..."`;
+    }
+
+    if (messageCount <= 8) {
+        return '💡 别忘了询问既往史和用药史！';
+    } else if (messageCount <= 12) {
+        return '💡 考虑排查危险信号，如胸闷、呼吸困难等';
+    } else {
+        return '💡 信息采集充分后，可以考虑开具检查或初步诊断';
+    }
+};
 
 export const ChatInterface: React.FC = () => {
     const { apiKey, apiBaseUrl } = useUserStore();
-    const { caseId, messages, addMessage } = useTrainingStore();
-
-    // Remove local messages state
-    // const [messages, setMessages] = useState<Message[]>...
+    const { caseId, messages, addMessage, patientMood, updateMood } = useTrainingStore();
 
     const [inputValue, setInputValue] = useState('');
     const [loading, setLoading] = useState(false);
+    const [showQuickPanel, setShowQuickPanel] = useState(true);
+    const [showCoverage, setShowCoverage] = useState(true);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const scrollToBottom = () => {
@@ -21,6 +51,23 @@ export const ChatInterface: React.FC = () => {
     };
 
     useEffect(scrollToBottom, [messages]);
+
+    // OPQRST 覆盖率追踪 (using shared utility)
+    const coverage = useMemo(() => detectOPQRSTCoverage(messages), [messages]);
+    const coveredItems = coverage.covered;
+    const coveragePercent = coverage.percentage;
+
+    // 动态提示
+    const currentHint = useMemo(() => getHintByStage(messages.length, coveredItems), [messages.length, coveredItems]);
+
+    // 快捷发送
+    const handleQuickSend = (question: string) => {
+        setInputValue(question);
+        setTimeout(() => {
+            const btn = document.getElementById('send-btn');
+            btn?.click();
+        }, 50);
+    };
 
     const handleSend = async () => {
         if (!inputValue.trim() || loading) return;
@@ -37,7 +84,6 @@ export const ChatInterface: React.FC = () => {
         setLoading(true);
 
         try {
-            // Prepare history for context
             const history = messages.map(m => ({
                 role: m.role === 'doctor' ? 'user' : m.role === 'patient' ? 'assistant' : 'system',
                 content: m.content
@@ -62,8 +108,11 @@ export const ChatInterface: React.FC = () => {
             };
             addMessage(aiMsg);
 
-            // Real-time Analysis (Fire and Forget)
+            // Analyze dialogue for scoring
             analyzeDialogue(userMsg.content);
+
+            // Analyze mood impact (async, non-blocking)
+            analyzeMoodImpact(userMsg.content);
 
         } catch (error: any) {
             console.error(error);
@@ -83,7 +132,6 @@ export const ChatInterface: React.FC = () => {
         try {
             const { updateScore } = useTrainingStore.getState();
 
-            // Call analysis API
             const res: any = await request.post('/ai/analyze', {
                 message,
                 variantId: caseId
@@ -95,16 +143,13 @@ export const ChatInterface: React.FC = () => {
             });
 
             if (res.result && res.result.scores) {
-                // Update scores in store
                 Object.entries(res.result.scores).forEach(([key, val]) => {
                     const score = val as number;
-                    // Accumulate score if positive, up to 100 max per dimension for MVP logic ?
-                    // Or logic: If AI returns 1, we add 5 points.
                     if (score > 0) {
                         const currentScores = useTrainingStore.getState().scores;
                         // @ts-ignore
                         const currentVal = currentScores[key] || 0;
-                        updateScore(key, Math.min(currentVal + 10, 100)); // Add 10 points per hit
+                        updateScore(key, Math.min(currentVal + 10, 100));
                     }
                 });
                 console.log("Analysis Result:", res.result);
@@ -112,12 +157,105 @@ export const ChatInterface: React.FC = () => {
         } catch (e) {
             console.error("Analysis failed", e);
         }
-    }
+    };
+
+    // Analyze mood impact of doctor's message
+    const analyzeMoodImpact = async (message: string) => {
+        try {
+            const res: any = await request.post('/ai/mood', {
+                message,
+                currentMood: {
+                    emotion: patientMood.emotion,
+                    trust: patientMood.trust,
+                    comfort: patientMood.comfort
+                }
+            }, {
+                headers: {
+                    'x-custom-api-key': apiKey,
+                    'x-custom-base-url': apiBaseUrl
+                }
+            });
+
+            if (res.success && res.data) {
+                const { emotion, trustDelta, comfortDelta, reason } = res.data;
+                const newTrust = Math.max(0, Math.min(100, patientMood.trust + (trustDelta || 0)));
+                const newComfort = Math.max(0, Math.min(100, patientMood.comfort + (comfortDelta || 0)));
+
+                updateMood({
+                    emotion: emotion as EmotionType,
+                    trust: newTrust,
+                    comfort: newComfort,
+                    lastChange: trustDelta !== 0 || comfortDelta !== 0 ? {
+                        dimension: Math.abs(trustDelta || 0) >= Math.abs(comfortDelta || 0) ? 'trust' : 'comfort',
+                        delta: Math.abs(trustDelta || 0) >= Math.abs(comfortDelta || 0) ? trustDelta : comfortDelta,
+                        reason: reason || ''
+                    } : null
+                });
+            }
+        } catch (e) {
+            console.error("Mood analysis failed", e);
+        }
+    };
 
     return (
         <div className="flex flex-col h-full bg-slate-50">
+            {/* Patient Mood Indicator Moved to StatusPanel */}
+            {/* OPQRST Progress Bar */}
+            <div className="bg-white px-4 py-3 border-b border-slate-200">
+                <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-slate-600">📊 问诊覆盖率 (OPQRST)</span>
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-blue-600">{coveragePercent}%</span>
+                        <button
+                            onClick={() => setShowCoverage(!showCoverage)}
+                            className="text-xs text-slate-400 hover:text-slate-600"
+                        >
+                            {showCoverage ? '收起' : '展开'}
+                        </button>
+                    </div>
+                </div>
+
+                {showCoverage && (
+                    <>
+                        <div className="flex gap-1">
+                            {OPQRST_ITEMS.map(item => {
+                                const isCovered = coveredItems.includes(item.key);
+                                return (
+                                    <div
+                                        key={item.key}
+                                        className={`flex-1 flex flex-col items-center p-2 rounded transition-all ${isCovered
+                                            ? 'bg-green-100 text-green-700 border border-green-300'
+                                            : 'bg-slate-100 text-slate-400 border border-slate-200'
+                                            }`}
+                                        title={item.fullName}
+                                    >
+                                        <span className="text-sm font-bold">{item.key}</span>
+                                        <span className="text-[10px] mt-0.5">
+                                            {isCovered ? '✓' : item.label}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        {/* Progress bar */}
+                        <div className="w-full bg-slate-200 rounded-full h-1.5 mt-2">
+                            <div
+                                className="bg-gradient-to-r from-blue-500 to-green-500 h-1.5 rounded-full transition-all duration-500"
+                                style={{ width: `${coveragePercent}%` }}
+                            />
+                        </div>
+                    </>
+                )}
+            </div>
+
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4">
+                {messages.length === 0 && (
+                    <div className="text-center text-slate-400 mt-10">
+                        <p className="text-lg mb-2">👋 患者已就位</p>
+                        <p className="text-sm">请开始问诊，点击下方快捷按钮或输入问题</p>
+                    </div>
+                )}
                 {messages.map(msg => (
                     <ChatBubble key={msg.id} message={msg} />
                 ))}
@@ -131,8 +269,60 @@ export const ChatInterface: React.FC = () => {
                 <div ref={messagesEndRef} />
             </div>
 
+            {/* Quick Questions Panel */}
+            {showQuickPanel && (
+                <div className="bg-slate-100 px-4 py-3 border-t border-slate-200">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-medium text-slate-600">⚡ 快捷问句 (OPQRST)</span>
+                        <button
+                            onClick={() => setShowQuickPanel(false)}
+                            className="text-xs text-slate-400 hover:text-slate-600"
+                        >
+                            收起
+                        </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                        {OPQRST_ITEMS.map((item, i) => {
+                            const isCovered = coveredItems.includes(item.key);
+                            return (
+                                <button
+                                    key={i}
+                                    onClick={() => handleQuickSend(item.question)}
+                                    disabled={loading}
+                                    className={`px-2 py-1 text-xs rounded transition-colors disabled:opacity-50 ${isCovered
+                                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                        : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                                        }`}
+                                    title={isCovered ? '已问过' : '点击发送'}
+                                >
+                                    {item.key} {item.fullName.split('(')[0]}
+                                    {isCovered && ' ✓'}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {OTHER_QUESTIONS.map((q, i) => (
+                            <button
+                                key={i}
+                                onClick={() => handleQuickSend(q.question)}
+                                disabled={loading}
+                                className="px-2 py-1 text-xs bg-slate-200 text-slate-700 rounded hover:bg-slate-300 disabled:opacity-50 transition-colors"
+                            >
+                                {q.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Input Area */}
-            <div className="bg-white px-4 py-4 border-t border-slate-200">
+            <div className="bg-white px-4 py-3 border-t border-slate-200">
+                {/* Dynamic Hint */}
+                <div className="mb-2 text-xs text-blue-600 bg-blue-50 px-3 py-2 rounded">
+                    {currentHint}
+                </div>
+
                 <div className="flex gap-2">
                     <input
                         type="text"
@@ -143,11 +333,17 @@ export const ChatInterface: React.FC = () => {
                         placeholder={loading ? "请等待回复..." : "请输入您的问题或诊断..."}
                         className="flex-1 appearance-none border border-slate-300 rounded-md py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm disabled:bg-slate-100"
                     />
-                    <Button onClick={handleSend} isLoading={loading}>发送</Button>
+                    <Button id="send-btn" onClick={handleSend} isLoading={loading}>发送</Button>
                 </div>
-                <div className="mt-2 flex gap-2 text-xs text-slate-500">
-                    <span>💡 提示：试着询问 "症状持续多久了？"</span>
-                </div>
+
+                {!showQuickPanel && (
+                    <button
+                        onClick={() => setShowQuickPanel(true)}
+                        className="mt-2 text-xs text-blue-600 hover:underline"
+                    >
+                        展开快捷问句
+                    </button>
+                )}
             </div>
         </div>
     );

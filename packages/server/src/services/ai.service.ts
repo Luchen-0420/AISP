@@ -127,25 +127,43 @@ export class AIService {
 请输出 JSON 格式的点评，包含以下字段：
 - highlights (优点): 学生做得好的地方（如问到了关键症状、态度好）。
 - improvements (待改进): 学生遗漏的问诊点或错误的判断。
-- resources (推荐资源): 针对不足推荐的医学教材章节或指南。
+- resources (推荐资源): 针对不足推荐的学习资源数组，每个资源包含:
+  - type: 资源类型（textbook=教材, guideline=指南, video=视频, case=病例库）
+  - title: 资源标题
+  - reason: 推荐理由（简短说明为什么推荐这个资源）
 
 格式要求：
 {
-  "highlights": "...",
-  "improvements": "...",
-  "resources": ["资源1", "资源2"]
+  "highlights": "学生的优点描述...",
+  "improvements": "需要改进的地方...",
+  "resources": [
+    { "type": "textbook", "title": "《内科学》第9版 - 相关章节", "reason": "针对本次病例的核心诊断" },
+    { "type": "guideline", "title": "相关临床指南名称", "reason": "规范化诊疗流程参考" }
+  ]
 }
-请直接输出 JSON，不要包含 Markdown 标记。`;
+请直接输出 JSON，不要包含 Markdown 标记。请确保 resources 是对象数组格式。`;
 
         // Format history for prompt
-        const historyText = chatHistory.map(m => `${m.role === 'doctor' ? '医学生' : '患者'}: ${m.content}`).join('\n');
+        const historyText = chatHistory.map(m => `${m.role === 'doctor' || m.role === 'user' ? '医学生' : '患者'}: ${m.content}`).join('\n');
         const message = `患者标准信息：\n${patientContext}\n\n对话记录：\n${historyText}`;
 
         const response = await this.chat(message, [], { ...options, systemPrompt });
 
         try {
             const jsonStr = response.replace(/```json/g, '').replace(/```/g, '').trim();
-            return JSON.parse(jsonStr);
+            const parsed = JSON.parse(jsonStr);
+
+            // Normalize resources to array of objects if it's array of strings
+            if (parsed.resources && Array.isArray(parsed.resources)) {
+                parsed.resources = parsed.resources.map((r: any) => {
+                    if (typeof r === 'string') {
+                        return { type: 'textbook', title: r, reason: '推荐学习' };
+                    }
+                    return r;
+                });
+            }
+
+            return parsed;
         } catch (e) {
             console.error("Failed to parse AI feedback", response);
             // Fallback
@@ -156,6 +174,102 @@ export class AIService {
             };
         }
     }
+
+    // Extract SOAP structure from chat history
+    async extractSOAPFromChat(messages: Array<{ role: string; content: string }>, options?: ChatOptions): Promise<any> {
+        const systemPrompt = `你是一名医学教育专家，负责从问诊对话中提取结构化病历信息。
+
+请根据以下对话记录，提取SOAP格式的病历信息。只提取对话中明确提到的信息，不要推测。
+
+输出格式(JSON)：
+{
+    "subjective": {
+        "chiefComplaint": "主诉（一句话）",
+        "historyOfPresentIllness": "现病史摘要",
+        "pastHistory": "既往史",
+        "allergies": "过敏史",
+        "medications": "用药史"
+    },
+    "diagnosis": {
+        "primary": "初步诊断（如无法确定则留空）",
+        "differentials": ["鉴别诊断1", "鉴别诊断2"],
+        "rationale": "诊断依据"
+    },
+    "plan": {
+        "lifestyle": ["生活方式建议1", "建议2"],
+        "followUp": "随访计划",
+        "education": "健康教育要点"
+    }
+}
+
+注意：
+1. 只提取对话中明确出现的信息
+2. 未提及的字段请留空字符串或空数组
+3. 使用患者原话，不要过度医学化`;
+
+        const historyText = messages.map(m => {
+            const role = m.role === 'doctor' ? '医学生' : m.role === 'patient' ? '患者' : '系统';
+            return `${role}: ${m.content}`;
+        }).join('\n');
+
+        const response = await this.chat(historyText, [], { ...options, systemPrompt });
+
+        try {
+            const jsonStr = response.replace(/```json/g, '').replace(/```/g, '').trim();
+            return JSON.parse(jsonStr);
+        } catch (e) {
+            console.error("Failed to parse SOAP extraction", response);
+            return null;
+        }
+    }
+
+    // Analyze mood impact of doctor's message
+    public async analyzeMoodImpact(doctorMessage: string, context: {
+        currentMood: { emotion: string; trust: number; comfort: number };
+        recentMessages?: any[];
+    }, options?: ChatOptions): Promise<any> {
+        const systemPrompt = `你是一个医患沟通分析专家。请分析医学生的这句话对模拟患者情绪和信任度的影响。
+
+当前患者状态：
+- 情绪: ${context.currentMood.emotion}
+- 信任度: ${context.currentMood.trust}%
+- 舒适度: ${context.currentMood.comfort}%
+
+请分析医学生的话语，并输出 JSON 格式：
+{
+  "emotion": "calm|anxious|frustrated|relieved|angry",
+  "trustDelta": -10到+10之间的整数,
+  "comfortDelta": -10到+10之间的整数,
+  "reason": "变化原因的简短描述（10字以内）"
+}
+
+评估标准：
+- 共情表达（如"理解您的担心"）：+5~10 信任度，情绪趋向 relieved
+- 打断或不耐烦：-5~10 信任度，情绪趋向 frustrated/angry
+- 问敏感问题无铺垫：-3~5 舒适度，情绪趋向 anxious
+- 详细解释病情：+5~8 信任度，情绪趋向 calm
+- 使用过多专业术语：-3 舒适度，情绪趋向 anxious
+- 表达关心（"别担心"）：+3~5 信任度，情绪趋向 relieved
+
+请直接输出 JSON，不要包含 Markdown 标记。`;
+
+        const response = await this.chat(`医学生说: "${doctorMessage}"`, [], { ...options, systemPrompt });
+
+        try {
+            const jsonStr = response.replace(/```json/g, '').replace(/```/g, '').trim();
+            return JSON.parse(jsonStr);
+        } catch (e) {
+            console.error("Failed to parse mood analysis", response);
+            // Default: no change
+            return {
+                emotion: context.currentMood.emotion,
+                trustDelta: 0,
+                comfortDelta: 0,
+                reason: ''
+            };
+        }
+    }
 }
 
 export const aiService = AIService.getInstance();
+

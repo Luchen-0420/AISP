@@ -36,6 +36,7 @@
 | template_id | UUID | FK -> case_templates.id |
 | variant_name | VARCHAR | 变体名称 (AI 生成或自动命名) |
 | difficulty_level | VARCHAR | 难度 |
+| estimated_duration | INT | 预计时长 (分钟) |
 
 ### `classes` (班级)
 | Column | Type | Description |
@@ -61,10 +62,18 @@
 ### `student_task_completions` (作业完成记录)
 | Column | Type | Description |
 |--------|------|-------------|
-| task_id | UUID | FK -> training_tasks.id (Nullable) |
+| id | UUID | PK (Auto-generated) |
+| task_id | UUID | FK -> training_tasks.id (Nullable for free practice) |
 | student_id | INT | FK -> users.id |
 | variant_id | UUID | FK -> case_variants.id |
-| final_score | JSONB | 最终得分 |
+| session_id | VARCHAR | Unique session identifier |
+| final_score | JSONB | 最终得分 (含各维度评分) |
+| session_data | JSONB | 会话数据 (messages, soapData) 用于回放 |
+| opqrst_coverage | JSONB | OPQRST覆盖率 { covered: [], percentage: number, details: {} } |
+| ai_feedback | JSONB | AI反馈 { highlights, improvements, resources: [{ type, title, reason }] } |
+| created_at | TIMESTAMP | 记录创建时间 |
+| started_at | TIMESTAMP | 训练开始时间 |
+| completed_at | TIMESTAMP | 训练完成时间 |
 
 ## 🔗 Relations
 *None*

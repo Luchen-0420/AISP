@@ -123,4 +123,21 @@ export class CaseController {
             return errorResponse(res, error.message);
         }
     }
+    static async getVariant(req, res) {
+        try {
+            const { id } = req.params;
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (!uuidRegex.test(id)) {
+                return errorResponse(res, `Invalid UUID format: ${id}`, 400);
+            }
+            const variant = await CaseService.getVariantById(id);
+            if (!variant)
+                return errorResponse(res, 'Variant not found', 404);
+            return successResponse(res, variant);
+        }
+        catch (error) {
+            console.error('getVariant Error:', error);
+            return errorResponse(res, error.message);
+        }
+    }
 }

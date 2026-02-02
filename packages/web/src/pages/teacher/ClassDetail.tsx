@@ -79,6 +79,11 @@ export const ClassDetail: React.FC = () => {
 
                 {/* Class Stats / Tasks */}
                 <div className="space-y-6">
+                    <Card title="数据洞察">
+                        <p className="text-sm text-slate-500 mb-4">查看全班学生的学习表现分析。</p>
+                        <Button className="w-full" onClick={() => navigate(`/teacher/classes/${id}/analytics`)}>📊 查看班级分析</Button>
+                    </Card>
+
                     <Card title="班级公告">
                         <p className="text-sm text-slate-600">{classData.description || '暂无说明...'}</p>
                         <Button className="w-full mt-4" variant="secondary">发布公告</Button>

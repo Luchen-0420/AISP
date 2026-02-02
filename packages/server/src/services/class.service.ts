@@ -108,4 +108,46 @@ export class ClassService {
             client.release();
         }
     }
+
+    // Get class analytics
+    static async getClassAnalytics(classId: string) {
+        const result = await pool.query(`
+            SELECT 
+                AVG((opqrst_coverage->>'percentage')::int) as avg_coverage,
+                AVG((final_score->>'empathy')::int) as avg_empathy,
+                AVG((final_score->>'logic')::int) as avg_logic,
+                AVG((final_score->>'detail')::int) as avg_detail,
+                AVG((final_score->>'relevance')::int) as avg_relevance,
+                COUNT(stc.id) as total_sessions
+            FROM student_task_completions stc
+            JOIN class_students cs ON stc.student_id = cs.student_id
+            WHERE cs.class_id = $1
+        `, [classId]);
+
+        const row = result.rows[0];
+
+        // Also get individual missed points
+        const missedItemsRes = await pool.query(`
+            SELECT item
+            FROM student_task_completions stc
+            JOIN class_students cs ON stc.student_id = cs.student_id
+            CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(stc.opqrst_coverage->'missed', '[]')) as item
+            WHERE cs.class_id = $1
+            GROUP BY item
+            ORDER BY count(*) DESC
+            LIMIT 5
+        `, [classId]);
+
+        return {
+            averages: {
+                coverage: Math.round(row.avg_coverage || 0),
+                empathy: Math.round(row.avg_empathy || 0),
+                logic: Math.round(row.avg_logic || 0),
+                detail: Math.round(row.avg_detail || 0),
+                relevance: Math.round(row.avg_relevance || 0),
+            },
+            totalSessions: Number(row.total_sessions || 0),
+            commonMissedItems: missedItemsRes.rows.map(r => r.item)
+        };
+    }
 }

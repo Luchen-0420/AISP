@@ -12,6 +12,11 @@
 |--------|----------|---------|-------------|
 | POST | `/api/ai/chat` | `ai.controller.ts` -> `chat` | Chat with AI (Headers: `x-api-key` etc. Body: `message`, `history`, `variantId`) |
 | POST | `/api/ai/test` | `ai.controller.ts` -> `testConnection` | Verify API connection and credentials |
+| POST | `/api/ai/exam` | `ai.controller.ts` -> `generateExamResult` | Generate exam result from AI |
+| POST | `/api/ai/analyze` | `ai.controller.ts` -> `analyzeDialogue` | Analyze dialogue for scoring |
+| POST | `/api/ai/feedback` | `ai.controller.ts` -> `generateFeedback` | 生成训练点评与分类学习资源推荐 |
+| POST | `/api/ai/extract-soap` | `ai.controller.ts` -> `extractSOAP` | Extract SOAP data from chat history |
+| POST | `/api/ai/mood` | `ai.controller.ts` -> `analyzeMood` | 分析医生消息对患者情绪/信任度的影响 |
 
 ## 🏫 Class Management
 | Method | Endpoint | Handler | Description |
@@ -38,3 +43,13 @@
 | Method | Endpoint | Handler | Description |
 |--------|----------|---------|-------------|
 | POST | `/api/training/submit` | `training.controller.ts` -> `submitSession` | Submit training session (scores, history, SOAP) |
+| GET | `/api/training/history` | `training.controller.ts` -> `getStudentHistory` | Get student's training history |
+| GET | `/api/training/session/:id` | `training.controller.ts` -> `getSessionById` | Get specific session for replay |
+| GET | `/api/training/recommendations` | `training.controller.ts` -> `getRecommendations` | Get personalized training recommendations |
+| GET | `/api/training/session/:id/export` | `training.controller.ts` -> `exportOSCE` | Export session score as CSV |
+
+## 📊 Analytics
+| Method | Endpoint | Handler | Description |
+|--------|----------|---------|-------------|
+| GET | `/api/classes/:id/analytics` | `class.controller.ts` -> `getClassAnalytics` | Get class performance analytics |
+

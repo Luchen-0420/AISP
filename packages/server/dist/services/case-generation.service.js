@@ -63,6 +63,10 @@ export class CaseGenerationService {
                 throw new Error("AI Generation Failed: Invalid JSON format. Raw: " + content.substring(0, 100));
             }
         }
+        // Inject original parameters to ensure they are preserved for saving
+        variantData.difficulty = params.difficulty;
+        variantData.compliance = params.compliance;
+        variantData.personality_traits = variantData.personality_traits || params.personality; // Prefer AI generated, fallback to input
         return variantData;
     }
     /**
@@ -89,7 +93,7 @@ export class CaseGenerationService {
             hidden_info: variantData.hidden_info
         };
         // Default values for required fields not in AI output
-        const difficultyLevel = 'Medium'; // Or derive from params if passed
+        const difficultyLevel = variantData.difficulty || variantData.difficulty_level || 'Medium';
         const estimatedDuration = 15;
         const result = await pool.query(`INSERT INTO case_variants 
             (template_id, variant_name, patient_info, medical_info, personality, difficulty_level, estimated_duration, created_at) 

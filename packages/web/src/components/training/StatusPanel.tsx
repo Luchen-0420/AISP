@@ -4,12 +4,17 @@ import { useTrainingStore } from '../../store/trainingStore';
 import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import request from '../../api/request';
+import { useUserStore } from '../../store/userStore';
+import { detectOPQRSTCoverage } from '../../utils/opqrst';
+import { PatientMoodIndicator } from './PatientMoodIndicator';
 
 export const StatusPanel: React.FC = () => {
     const navigate = useNavigate();
-    // const { id } = useParams();
-    const { startTime, turnCount, scores, status, currentVariant } = useTrainingStore();
+    const { apiKey, apiBaseUrl } = useUserStore();
+    const { startTime, turnCount, scores, status, currentVariant, messages, caseId } = useTrainingStore();
     const [elapsed, setElapsed] = useState(0);
+    const [extractingSOAP, setExtractingSOAP] = useState(false);
 
     useEffect(() => {
         if (status !== 'running' || !startTime) return;
@@ -23,7 +28,57 @@ export const StatusPanel: React.FC = () => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
+    };
+
+    // AI 自动提取 SOAP
+    const handleAutoFillSOAP = async () => {
+        if (messages.length < 3) {
+            alert('请先进行至少一轮问诊对话');
+            return;
+        }
+
+        setExtractingSOAP(true);
+        try {
+            const res: any = await request.post('/ai/extract-soap', {
+                messages: messages.map(m => ({ role: m.role, content: m.content })),
+                variantId: caseId
+            }, {
+                headers: {
+                    'x-custom-api-key': apiKey,
+                    'x-custom-base-url': apiBaseUrl
+                }
+            });
+
+            if (res.success && res.data) {
+                const { updateDiagnosis, updatePlan } = useTrainingStore.getState();
+
+                // Update diagnosis if extracted
+                if (res.data.diagnosis) {
+                    updateDiagnosis({
+                        primary: res.data.diagnosis.primary || '',
+                        differentials: res.data.diagnosis.differentials || [],
+                        rationale: res.data.diagnosis.rationale || ''
+                    });
+                }
+
+                // Update plan if extracted
+                if (res.data.plan) {
+                    updatePlan({
+                        lifestyle: res.data.plan.lifestyle || [],
+                        followUp: res.data.plan.followUp || '',
+                        education: res.data.plan.education || ''
+                    });
+                }
+
+                alert('✅ SOAP 信息已自动填充，请在各面板中查看和编辑');
+            }
+        } catch (error) {
+            console.error('SOAP extraction failed', error);
+            alert('AI 提取失败，请手动填写');
+        } finally {
+            setExtractingSOAP(false);
+        }
+    };
 
     return (
         <div className="space-y-4 h-full">
@@ -44,6 +99,12 @@ export const StatusPanel: React.FC = () => {
                     <div className="flex justify-between items-center">
                         <span className="text-slate-600 text-sm">当前回合</span>
                         <span className="font-bold text-slate-900">{turnCount} / 30</span>
+                    </div>
+
+                    <div className="pt-4 border-t border-slate-100">
+                        <div className="mb-4">
+                            <PatientMoodIndicator />
+                        </div>
                     </div>
 
                     <div className="pt-4 border-t border-slate-100">
@@ -94,33 +155,45 @@ export const StatusPanel: React.FC = () => {
                     </p>
                 </div>
 
+                {/* AI Auto-fill Button */}
+                <Button
+                    className="w-full mb-2"
+                    variant="outline"
+                    onClick={handleAutoFillSOAP}
+                    isLoading={extractingSOAP}
+                    disabled={extractingSOAP || messages.length < 3}
+                >
+                    🤖 AI 自动填充 SOAP
+                </Button>
+
                 <Button
                     className="w-full"
                     variant="primary"
                     onClick={async () => {
                         if (window.confirm('确定结束本次问诊训练吗？')) {
-                            // Collect data
                             const state = useTrainingStore.getState();
 
-                            // To be safe, we might want to check if data is ready, but for now just submit
+                            // Calculate OPQRST coverage before submit
+                            const opqrstCoverage = detectOPQRSTCoverage(state.messages);
+
                             try {
                                 await import('../../services/training.service').then(async ({ trainingService }) => {
-                                    await trainingService.submitSession({
-                                        variantId: state.caseId || '', // In this context caseId is actually holding the ID passed to startSession
+                                    const res: any = await trainingService.submitSession({
+                                        variantId: state.caseId || '',
                                         sessionId: state.sessionId || '',
                                         scores: state.scores,
                                         soapData: state.soapData,
-                                        history: [], // We might need to store history in store to pass it here, or ChatInterface needs to sync it. 
-                                        // For MVP Phase 9, let's omit history or assume store tracks it? 
-                                        // Wait, store doesn't track proper chat history yet, only turn count.
-                                        // Let's rely on what we have. Chat history is currently local in ChatInterface.
-                                        // To solve this properly, ChatInterface should probably update store or we just submit scores for now.
-                                        // Let's submit scores first.
-
+                                        history: state.messages,
+                                        opqrstCoverage // Include coverage data
                                     });
 
                                     state.endSession();
-                                    navigate('result', { state: { resultData: state.scores } }); // Pass scores to result page locally for now, real DB fetch can happen too
+                                    navigate('result', {
+                                        state: {
+                                            resultData: state.scores,
+                                            completionId: res.completionId // Pass ID for export
+                                        }
+                                    });
                                 });
                             } catch (e) {
                                 console.error("Submission failed", e);

@@ -98,3 +98,134 @@ export const testConnection = async (req, res) => {
         res.status(400).json({ success: false, message: error.message || 'Connection failed' });
     }
 };
+export const generateExamResult = async (req, res) => {
+    try {
+        const { variantId, examName } = req.body;
+        // Headers for BYOK
+        const apiKey = (req.headers['x-custom-api-key'] || req.headers['x-api-key']);
+        const baseUrl = (req.headers['x-custom-base-url'] || req.headers['x-base-url']);
+        const modelName = req.headers['x-model-name'];
+        if (!variantId || !examName) {
+            return res.status(400).json({ message: 'variantId and examName are required' });
+        }
+        // Fetch Patient Context
+        const { CaseService } = await import('../services/case.service');
+        const variant = await CaseService.getVariantById(variantId);
+        if (!variant) {
+            return res.status(404).json({ message: 'Variant not found' });
+        }
+        const pInfo = variant.patient_info || {};
+        const mInfo = variant.medical_info || {};
+        const patientContext = `
+姓名：${pInfo.name}，性别：${pInfo.gender}，年龄：${pInfo.age}
+主诉：${mInfo.chief_complaint}
+现病史：${mInfo.history_of_present_illness}
+既往史：${mInfo.past_medical_history || '无'}
+        `;
+        const result = await aiService.generateExamReport(examName, patientContext, {
+            apiKey,
+            baseUrl,
+            modelName
+        });
+        res.json({ result });
+    }
+    catch (error) {
+        console.error('Generate Exam Error:', error);
+        res.status(500).json({ message: 'Failed to generate exam result', error: error.message });
+    }
+};
+export const analyzeDialogue = async (req, res) => {
+    try {
+        const { message, variantId } = req.body;
+        // Headers for BYOK
+        const apiKey = (req.headers['x-custom-api-key'] || req.headers['x-api-key']);
+        const baseUrl = (req.headers['x-custom-base-url'] || req.headers['x-base-url']);
+        const modelName = req.headers['x-model-name'];
+        // Fetch Patient Context
+        const { CaseService } = await import('../services/case.service');
+        const variant = variantId ? await CaseService.getVariantById(variantId) : null;
+        const context = variant
+            ? `主诉：${variant.medical_info?.chief_complaint || ''}。现病史：${variant.medical_info?.history_of_present_illness || ''}`
+            : '标准病例上下文';
+        const result = await aiService.analyzeDialogue(message, context, {
+            apiKey,
+            baseUrl,
+            modelName
+        });
+    }
+    catch (error) {
+        console.error('Analyze Dialogue Error:', error);
+        res.status(500).json({ message: 'Failed to analyze dialogue', error: error.message });
+    }
+};
+export const generateFeedback = async (req, res) => {
+    try {
+        const { history, variantId } = req.body;
+        // Headers for BYOK
+        const apiKey = (req.headers['x-custom-api-key'] || req.headers['x-api-key']);
+        const baseUrl = (req.headers['x-custom-base-url'] || req.headers['x-base-url']);
+        const modelName = req.headers['x-model-name'];
+        // Fetch Patient Context
+        const { CaseService } = await import('../services/case.service');
+        const variant = variantId ? await CaseService.getVariantById(variantId) : null;
+        const context = variant
+            ? `诊断：${variant.disease_name}。主诉：${variant.medical_info?.chief_complaint}。`
+            : '标准病例上下文';
+        const result = await aiService.generateSessionFeedback(history, context, {
+            apiKey,
+            baseUrl,
+            modelName
+        });
+        res.json({ result });
+    }
+    catch (error) {
+        console.error('Feedback Gen Error:', error);
+        res.status(500).json({ message: 'Failed to generate feedback', error: error.message });
+    }
+};
+// Extract SOAP data from chat history
+export const extractSOAP = async (req, res) => {
+    try {
+        const { messages, variantId } = req.body;
+        const apiKey = req.headers['x-custom-api-key'];
+        const baseUrl = req.headers['x-custom-base-url'];
+        const modelName = req.headers['x-model-name'];
+        if (!messages || messages.length === 0) {
+            return res.status(400).json({ success: false, message: 'Messages are required' });
+        }
+        const result = await aiService.extractSOAPFromChat(messages, {
+            apiKey,
+            baseUrl,
+            modelName
+        });
+        res.json({ success: true, data: result });
+    }
+    catch (error) {
+        console.error('SOAP Extraction Error:', error);
+        res.status(500).json({ success: false, message: 'Failed to extract SOAP', error: error.message });
+    }
+};
+// Analyze mood impact of doctor's message
+export const analyzeMood = async (req, res) => {
+    try {
+        const { message, currentMood } = req.body;
+        const apiKey = req.headers['x-custom-api-key'];
+        const baseUrl = req.headers['x-custom-base-url'];
+        const modelName = req.headers['x-model-name'];
+        if (!message) {
+            return res.status(400).json({ success: false, message: 'Message is required' });
+        }
+        const result = await aiService.analyzeMoodImpact(message, {
+            currentMood: currentMood || { emotion: 'calm', trust: 60, comfort: 60 }
+        }, {
+            apiKey,
+            baseUrl,
+            modelName
+        });
+        res.json({ success: true, data: result });
+    }
+    catch (error) {
+        console.error('Mood Analysis Error:', error);
+        res.status(500).json({ success: false, message: 'Failed to analyze mood', error: error.message });
+    }
+};
