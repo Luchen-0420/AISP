@@ -142,19 +142,31 @@ pnpm dev
 
 ```
 root/
-├── docs/                   # 项目文档与资源
+├── .agent/                 # Agent context & workflows
+├── docs/                   # Documentation
+├── scripts/                # Root utility scripts
 ├── packages/
-│   ├── web/                # 前端工程
+│   ├── web/                # Frontend (React + Vite)
 │   │   ├── src/
-│   │   │   ├── components/ # 通用组件 (UI, Layouts)
-│   │   │   ├── pages/      # 页面视图 (Student, Teacher, Training)
-│   │   │   ├── store/      # Zustand store (User, TrainingState)
-│   │   │   └── utils/      # 工具函数
-│   └── server/             # 后端工程
+│   │   │   ├── api/        # Axios setup
+│   │   │   ├── components/ # UI Components
+│   │   │   ├── layouts/    # Page Layouts
+│   │   │   ├── pages/      # Route Components
+│   │   │   ├── services/   # Frontend API Services
+│   │   │   ├── store/      # State (Zustand)
+│   │   │   └── types/      # TS Interfaces
+│   │   └── vite.config.ts  # Build Config
+│   └── server/             # Backend (Express)
 │       ├── src/
-│       │   ├── controllers/# 业务逻辑控制器 (Training, AI, Case)
-│       │   ├── db/         # 数据库连接与 Schema
-│       │   └── services/   # 核心服务 (AIService, CaseService)
+│       │   ├── controllers/# Request Handlers
+│       │   ├── db/         # Database Connection
+│       │   ├── middleware/ # Auth & Error Middleware
+│       │   ├── models/     # DB Models
+│       │   ├── prompts/    # AI Prompts
+│       │   └── services/   # Business Logic
+│       └── .env            # Environment Variables
+├── pnpm-workspace.yaml     # Workspace Config
+└── package.json            # Root Config
 ```
 
 ## 📄 License
