@@ -3,6 +3,7 @@ import { useTrainingStore } from '../../../store/trainingStore';
 import { ExamItem } from '../../../types/soap';
 import { Button } from '../../ui/Button';
 import { Badge } from '../../ui/Badge';
+import { SimpleMarkdownRenderer } from '../../ui/SimpleMarkdownRenderer';
 
 // ============ 检查项目数据库 ============
 interface ExamDefinition {
@@ -150,13 +151,13 @@ export const AuxiliaryExamPanel: React.FC = () => {
             };
             addExam(resultExam);
 
-            const { addMessage } = useTrainingStore.getState();
-            addMessage({
-                id: Date.now().toString(),
-                role: 'system',
-                content: `【检查结果】${exam.name}：\n${res.result}`,
-                timestamp: Date.now()
-            });
+            // const { addMessage } = useTrainingStore.getState();
+            // addMessage({
+            //     id: Date.now().toString(),
+            //     role: 'system',
+            //     content: `【检查结果】${exam.name}：\n${res.result}`,
+            //     timestamp: Date.now()
+            // });
 
         } catch (error) {
             console.error("生成检查结果失败", error);
@@ -261,8 +262,8 @@ export const AuxiliaryExamPanel: React.FC = () => {
                                 </div>
                                 {item.result && (
                                     <div className="mt-2 text-sm text-slate-600 bg-slate-50 p-2 rounded whitespace-pre-wrap">
-                                        <span className="font-semibold">结果: </span>
-                                        {item.result}
+                                        <span className="font-semibold block mb-1">结果: </span>
+                                        <SimpleMarkdownRenderer content={item.result} />
                                     </div>
                                 )}
                             </div>

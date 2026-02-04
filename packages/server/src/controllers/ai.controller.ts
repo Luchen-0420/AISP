@@ -180,6 +180,8 @@ export const analyzeDialogue = async (req: Request, res: Response) => {
             modelName
         });
 
+        res.json({ result });
+
     } catch (error: any) {
         console.error('Analyze Dialogue Error:', error);
         res.status(500).json({ message: 'Failed to analyze dialogue', error: error.message });

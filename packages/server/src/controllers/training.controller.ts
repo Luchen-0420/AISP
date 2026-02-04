@@ -43,8 +43,11 @@ export class TrainingController {
             };
 
             // Generate AI feedback with resource recommendations
+            // Only generate if there is actual student interaction
+            const hasStudentInteraction = history && history.some((m: any) => m.role === 'doctor' || m.role === 'student'); // compatible with both roles
             let aiFeedback = null;
-            if (history && history.length > 0 && apiKey) {
+
+            if (hasStudentInteraction && apiKey) {
                 try {
                     // Get variant context for AI
                     const { CaseService } = await import('../services/case.service');

@@ -14,9 +14,11 @@ export const TrainingResultPage: React.FC = () => {
     // Get scores from passed state (from StatusPanel) or fallback to store/empty
     // In real app, we might fetch from DB using an ID in URL
     const passedScores = location.state?.resultData;
+    // Get pre-calculated feedback from navigation state
+    const passedFeedback = location.state?.feedback;
     const { scores: storeScores } = useTrainingStore();
 
-    const rawScores = (passedScores || storeScores) as Record<string, number>;
+    const rawScores = (passedScores || storeScores || {}) as Record<string, number>;
 
     // Define Max Scores per dimension
     const MAX_SCORES: Record<string, number> = {
@@ -51,13 +53,15 @@ export const TrainingResultPage: React.FC = () => {
     ];
 
     // AI Feedback State
-    const [aiFeedback, setAiFeedback] = React.useState<{ highlights: string; improvements: string; resources: string[] } | null>(null);
+    const [aiFeedback, setAiFeedback] = React.useState<{ highlights: string; improvements: string; resources: string[] } | null>(passedFeedback || null);
     const [loadingFeedback, setLoadingFeedback] = React.useState(false);
     const { messages, caseId } = useTrainingStore();
     const { apiKey, apiBaseUrl } = useUserStore();
 
     React.useEffect(() => {
         const fetchFeedback = async () => {
+            // optimized: if we already have feedback passed from StatusPanel, don't fetch again
+            if (aiFeedback) return;
             if (!messages || messages.length === 0) return;
             setLoadingFeedback(true);
             try {
@@ -87,11 +91,8 @@ export const TrainingResultPage: React.FC = () => {
             } catch (err) {
                 console.error("Failed to fetch feedback, using fallback", err);
                 // Robust Fallback Data
-                setAiFeedback({
-                    highlights: "你在问诊开始阶段展现了良好的职业素养，能够迅速建立医患信任。关键症状捕捉较为准确，问诊思路清晰。",
-                    improvements: "建议进一步细化对鉴别诊断（如胃食管反流病）的排查。同时，在开具处方前，建议询问患者的过敏史和肝肾功能，以确保用药安全。",
-                    resources: ["《内科学》- 心绞痛章节", "心血管疾病诊疗指南"]
-                });
+                // Robust Fallback Data
+                setAiFeedback(null);
             } finally {
                 setLoadingFeedback(false);
             }
@@ -120,7 +121,7 @@ export const TrainingResultPage: React.FC = () => {
                         <div className="text-sm text-slate-500 mb-2 uppercase tracking-wide">综合评分</div>
                         <div className="text-5xl font-extrabold text-blue-600 mb-2">{Math.round(totalScore)}</div>
                         <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                            {totalScore >= 90 ? 'A+ 优秀' : totalScore >= 80 ? 'A 良好' : 'B 合格'}
+                            {totalScore >= 90 ? 'A+ 优秀' : totalScore >= 80 ? 'A 良好' : totalScore >= 70 ? 'B 合格' : totalScore >= 60 ? 'C 及格' : 'D 待努力'}
                         </div>
                     </Card>
 
@@ -160,12 +161,14 @@ export const TrainingResultPage: React.FC = () => {
                                 <strong className="text-amber-700 block mb-1">🔧 待改进：</strong>
                                 {aiFeedback.improvements}
                             </p>
-                            {aiFeedback.resources && aiFeedback.resources.length > 0 && (
+                            {aiFeedback.resources && Array.isArray(aiFeedback.resources) && aiFeedback.resources.length > 0 && (
                                 <div className="bg-blue-50 p-4 rounded-md border border-blue-100 mt-4">
                                     <h4 className="font-semibold text-blue-900 mb-2">推荐学习资源</h4>
                                     <ul className="list-disc list-inside text-sm text-blue-800 space-y-1">
-                                        {aiFeedback.resources.map((res: string, idx: number) => (
-                                            <li key={idx}>{res}</li>
+                                        {aiFeedback.resources.map((res: any, idx: number) => (
+                                            <li key={idx}>
+                                                {typeof res === 'string' ? res : `${res.title || '资源'} - ${res.reason || ''}`}
+                                            </li>
                                         ))}
                                     </ul>
                                 </div>

@@ -27,3 +27,8 @@ Thumbs.db
 .vscode
 *.swp
 *.swo
+
+
+# Local directories
+.agent
+docs

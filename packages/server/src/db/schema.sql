@@ -112,6 +112,9 @@ CREATE TABLE IF NOT EXISTS student_task_completions (
 
     -- 训练记录 (关联到具体的 session_id，这里简化处理)
     session_id VARCHAR(100), 
+    session_data JSONB, -- Chat history and SOAP data
+    opqrst_coverage JSONB, -- OPQRST coverage analysis
+    ai_feedback JSONB, -- AI generated feedback
     started_at TIMESTAMP,
     completed_at TIMESTAMP,
 

@@ -191,7 +191,8 @@ export const StatusPanel: React.FC = () => {
                                     navigate('result', {
                                         state: {
                                             resultData: state.scores,
-                                            completionId: res.completionId // Pass ID for export
+                                            completionId: res.completionId, // Pass ID for export
+                                            feedback: res.aiFeedback // Pass AI Feedback directly to avoid re-fetching
                                         }
                                     });
                                 });

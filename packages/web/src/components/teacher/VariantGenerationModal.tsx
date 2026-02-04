@@ -89,6 +89,22 @@ export const VariantGenerationModal: React.FC<VariantGenerationModalProps> = ({
                 <div className="p-6">
                     {step === 'config' ? (
                         <div className="space-y-6">
+                            {/* Target Template Warning Banner */}
+                            <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
+                                <div className="flex">
+                                    <div className="flex-shrink-0">
+                                        <span className="text-xl">🚩</span>
+                                    </div>
+                                    <div className="ml-3">
+                                        <p className="text-sm text-blue-700">
+                                            当前目标模版： <span className="font-bold text-lg">{caseTitle}</span>
+                                        </p>
+                                        <p className="text-xs text-blue-500 mt-1">
+                                            生成的病例将归档至此模版下，请确保您的描述与该病种相关。
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">难度等级</label>
