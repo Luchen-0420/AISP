@@ -142,8 +142,6 @@ pnpm dev
 
 ```
 root/
-├── .agent/                 # Agent context & workflows
-├── docs/                   # Documentation
 ├── scripts/                # Root utility scripts
 ├── packages/
 │   ├── web/                # Frontend (React + Vite)
