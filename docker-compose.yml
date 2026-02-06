@@ -7,17 +7,17 @@ services:
     container_name: aisp-db
     restart: always
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: zyj_test_demo
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - db_data:/var/lib/postgresql/data
-      # Auto-init schema on first startup
+      # 第一次启动时自动初始化表结构
       - ./packages/server/src/db/schema.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - app-network
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB}" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -33,9 +33,9 @@ services:
       - "3001:3001"
     environment:
       PORT: 3001
-      DATABASE_URL: postgres://postgres:password@db:5432/zyj_test_demo
-      JWT_SECRET: ${JWT_SECRET:-dev_secret_key_change_me}
-      # OpenAI Configs (Can be passed via .env file)
+      # 动态拼接数据库连接字符串，确保密码与 db 服务同步
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL}
       AI_MODEL_NAME: ${AI_MODEL_NAME}
