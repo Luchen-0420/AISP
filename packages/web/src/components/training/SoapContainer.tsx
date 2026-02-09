@@ -1,19 +1,19 @@
 import React, { useState } from 'react';
-import { AuxiliaryExamPanel } from './modules/AuxiliaryExamPanel';
+// import { AuxiliaryExamPanel } from './modules/AuxiliaryExamPanel'; // 简化流程：移除辅助检查
 import { DiagnosisPanel } from './modules/DiagnosisPanel';
-import { TreatmentPlanPanel } from './modules/TreatmentPlanPanel';
+// import { TreatmentPlanPanel } from './modules/TreatmentPlanPanel'; // 简化流程：移除处置计划
 
 const tabs = [
     { id: 'S', label: 'S 病史采集' },
-    { id: 'O', label: 'O 辅助检查' },
+    // { id: 'O', label: 'O 辅助检查' }, // 简化流程：移除辅助检查
     { id: 'A', label: 'A 诊断结论' },
-    { id: 'P', label: 'P 处置计划' },
+    // { id: 'P', label: 'P 处置计划' }, // 简化流程：移除处置计划
 ];
 
 export const SoapContainer: React.FC = () => {
     // const { currentStage, setStage } = useTrainingStore(); // Future use for auto-switching or validation
 
-    const [activeTab, setActiveTab] = useState('O');
+    const [activeTab, setActiveTab] = useState('S'); // 默认显示 S
 
     return (
         <div className="bg-white border-l border-slate-200 h-full flex flex-col">
@@ -24,8 +24,8 @@ export const SoapContainer: React.FC = () => {
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
                         className={`flex-1 py-3 text-sm font-medium text-center border-b-2 transition-colors ${activeTab === tab.id
-                                ? 'border-primary text-primary'
-                                : 'border-transparent text-slate-500 hover:text-slate-700'
+                            ? 'border-primary text-primary'
+                            : 'border-transparent text-slate-500 hover:text-slate-700'
                             }`}
                     >
                         {tab.id}
@@ -45,11 +45,11 @@ export const SoapContainer: React.FC = () => {
                     </div>
                 )}
 
-                {activeTab === 'O' && <AuxiliaryExamPanel />}
+                {/* {activeTab === 'O' && <AuxiliaryExamPanel />} */}
 
                 {activeTab === 'A' && <DiagnosisPanel />}
 
-                {activeTab === 'P' && <TreatmentPlanPanel />}
+                {/* {activeTab === 'P' && <TreatmentPlanPanel />} */}
             </div>
         </div>
     );

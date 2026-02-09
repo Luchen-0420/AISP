@@ -15,30 +15,26 @@ const OTHER_QUESTIONS = [
 ];
 
 // ============ 动态提示生成 ============
+// ============ 动态提示生成 ============
 const getHintByStage = (messageCount: number, coveredItems: string[]): string => {
-    const uncovered = OPQRST_ITEMS.filter(item => !coveredItems.includes(item.key));
-
+    // 符合“问了再说”原则，不主动提供具体问题或诊断方向
     if (messageCount === 0) {
-        return '💡 开始问诊吧！先问问患者「您哪里不舒服？」';
+        return '💡 请开始问诊，首先询问患者的主诉';
     }
 
-    if (uncovered.length > 0 && messageCount < 12) {
-        const next = uncovered[0];
-        return `💡 建议问：${next.fullName} — "${next.question.slice(0, 20)}..."`;
+    // 检查 OPQRST 覆盖情况，仅做笼统提示
+    const isCoverageComplete = OPQRST_ITEMS.every(item => coveredItems.includes(item.key));
+
+    if (!isCoverageComplete) {
+        return '💡 请继续完善病史采集，注意涵盖 OPQRST 各个维度';
     }
 
-    if (messageCount <= 8) {
-        return '💡 别忘了询问既往史和用药史！';
-    } else if (messageCount <= 12) {
-        return '💡 考虑排查危险信号，如胸闷、呼吸困难等';
-    } else {
-        return '💡 信息采集充分后，可以考虑开具检查或初步诊断';
-    }
+    return '💡 病史采集已基本完成，请根据收集到的信息进行初步诊断';
 };
 
 export const ChatInterface: React.FC = () => {
     const { apiKey, apiBaseUrl } = useUserStore();
-    const { caseId, messages, addMessage, patientMood, updateMood } = useTrainingStore();
+    const { caseId, messages, addMessage, patientMood, updateMood, incrementTurn } = useTrainingStore();
 
     const [inputValue, setInputValue] = useState('');
     const [loading, setLoading] = useState(false);
@@ -80,6 +76,7 @@ export const ChatInterface: React.FC = () => {
         };
 
         addMessage(userMsg);
+        incrementTurn(); // 增加回合数
         setInputValue('');
         setLoading(true);
 
